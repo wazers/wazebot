@@ -13,6 +13,9 @@ var config = require('./config'),
     //include "log: false" to disable logging
     //or a "logLevel" integer from 0 to 7 to adjust logging verbosity
   }),
+  express = require('express'),
+  bodyParser = require('body-parser'),
+  app = express(),
   geocoderProvider = 'google', httpAdapter = 'http';
 // optional
 /*var extra = {
@@ -25,7 +28,7 @@ var geocoder = require('node-geocoder')(geocoderProvider, httpAdapter);//, extra
 var users, channels, groups, team, privateGroup, publicChannel, uLang = {};
 // connect the bot to a stream of messages
 var bot = controller.spawn({
-  token: config.slack.token,
+  token: process.env.SLACK_TOKEN || config.slack.token,
   incoming_webhook: {
     url: "https://hooks.slack.com/services/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"
   }
@@ -435,13 +438,27 @@ controller.on('message_received', function (bot, data) {
 /*
  * Slash command handling
  */
-controller.setupWebserver(config.server_port, function (err, express_webserver) {
-  controller.createWebhookEndpoints(express_webserver, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
-  // you can pass the tokens as an array, or variable argument list
-  //controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN_1', 'AUTH_TOKEN_2');
-  // or
-  //controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN');
-});
+// controller.setupWebserver(config.server_port, function (err, express_webserver) {
+var static_dir = __dirname + '/public';
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(express.static(static_dir));
+
+app.listen(
+  config.server_port,
+  config.server_ip,
+  function () {
+    console.log('** Starting webserver on ' +
+      ((config.server_ip) ? config.server_ip + ':' : 'port ') +
+      config.server_port);
+  });
+
+controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
+// you can pass the tokens as an array, or variable argument list
+//controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN_1', 'AUTH_TOKEN_2');
+// or
+//controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN');
 
 function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
   return new Promise(function (fulfill, reject) {

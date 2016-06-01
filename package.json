@@ -7,8 +7,10 @@
   },
   "main": "app.js",
   "dependencies": {
+    "body-parser": "^1.15.1",
     "botkit": "^0.2.0",
     "camo": "^0.12.1",
+    "express": "^4.13.4",
     "merge": "^1.2.0",
     "mongodb": "^2.1.20",
     "node-geocoder": "^3.10.0",
