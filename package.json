@@ -1,0 +1,17 @@
+{
+  "name": "wazebot",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node app"
+  },
+  "main": "app.js",
+  "dependencies": {
+    "botkit": "^0.2.0",
+    "camo": "^0.12.1",
+    "merge": "^1.2.0",
+    "mongodb": "^2.1.20",
+    "node-geocoder": "^3.10.0",
+    "slackbots": "^0.5.1"
+  }
+}
