@@ -22,8 +22,8 @@ let merge = require('merge'), env = process.env.NODE_ENV || 'development',
         user: "utilisateur"
       }
     },
-    server_port: process.env.OPENSHIFT_NODEJS_PORT || 80,
-    server_ip: process.env.OPENSHIFT_NODEJS_IP || '127.0.0.1',
+    server_port: parseInt(process.env.OPENSHIFT_NODEJS_PORT) || 80,
+    server_ip: process.env.OPENSHIFT_NODEJS_IP,
     dburi: (process.env.OPENSHIFT_MONGODB_DB_URL || "mongodb://localhost/") + "wazebot"
   };
 

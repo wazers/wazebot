@@ -59,7 +59,7 @@ require('./schemes');
 var usersColl;
 MongoClient.connect(config.dburi, function (err, db) {
   if (err)
-    return console.error(err);
+    return console.warn(err);
   console.log("Connected correctly to server");
   usersColl = db.collection('users');
   // db.close();
@@ -183,7 +183,7 @@ function askLanguagePref(userId) {
   if (!uLang[userId]) {
     bot.startPrivateConversation({user: userId}, function (err, conv) {
       if (err) {
-        return console.error("PC err: ", err);
+        return console.warn("PC err: ", err);
       }
 
       // conv.say(msg);
@@ -252,7 +252,7 @@ function askLanguagePref(userId) {
               new: true
             }).then(function (err, ud) {
               if (err)
-                console.error(err);
+                console.warn(err);
               let ui = ud.pgw;
               // console.log("findOne", ui);
               bot.api.reactions.add({
@@ -399,7 +399,7 @@ controller.on('message_received', function (bot, data) {
                   }
                 }, {upsert: true}).then(function (err) {
                   if (err)
-                    console.error(err);
+                    console.warn(err);
                 });
             }
           });//, {as_user: true});
@@ -444,7 +444,8 @@ var static_dir = __dirname + '/public';
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static(static_dir));
-
+if (typeof config.server_ip === "undefined")
+  console.warn('No OPENSHIFT_NODEJS_IP environment variable');
 app.listen(
   config.server_port,
   config.server_ip,
