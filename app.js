@@ -9,7 +9,8 @@ var config = require('./config'),
 // mongoStorage = require('botkit-storage-mongo')({mongoUri: 'mongodb://localhost/botkit'}),
   controller = Botkit.slackbot({
     // storage: mongoStorage,
-    debug: false
+    debug: false,
+    port: 4008
     //include "log: false" to disable logging
     //or a "logLevel" integer from 0 to 7 to adjust logging verbosity
   }),
