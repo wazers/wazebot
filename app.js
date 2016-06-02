@@ -3,6 +3,7 @@
 var config = require('./config'),
   connect = require('camo').connect,
   MongoClient = require('mongodb').MongoClient,
+  exec = require('child_process').exec,
   Botkit = require('botkit'),
   url = require('url'),
   allowedUrlKeys = ["env", "lon", "lat", "zoom", "segments", "nodes", "cameras", "mapUpdateRequest", "mapProblem", "venues"],
@@ -283,10 +284,25 @@ function fillTemplate(str, userId) {
 }
 controller.on('hello', function (bot, data) {
   console.log("hello", publicChannel.id);
-  bot.api.chat.postMessage({
-    channel: publicChannel.id,
-    text: ":waze-baby: Hi, I've just (re)connected; automatic link cleanups should work again; although you should use `/closure [level] [url] [extra info]` and/or `/l [level] [url] [extra info]`",
-    as_user: true
+  exec("git log -1 --pretty='`%s` by `%cN`' | cat", function (error, stdout, stderr) {
+    if (error || stderr)
+      console.warn(error || stderr);
+    bot.api.chat.postMessage({
+      channel: publicChannel.id,
+      text: ":waze-baby: Hi, I've just (re)connected; automatic link cleanups should work again; although you should use `/closure [level] [url] [extra info]` and/or `/l [level] [url] [extra info]`" +
+      ((stdout) ? "\nLast change: " + stdout : ""),
+      as_user: true
+    });
+  });
+  exec("git log -1 --pretty='`%s` by <mailto:%cE|%cN>%-b%nSigned by: %GS %G?%nNotes: %N' | cat", function (error, stdout, stderr) {
+    if (error || stderr)
+      console.warn(error || stderr);
+    bot.api.chat.postMessage({
+      channel: privateGroup.id,
+      text: ":waze-baby: Hi, I've just (re)connected; automatic link cleanups should work again; although you should use `/closure [level] [url] [extra info]` and/or `/l [level] [url] [extra info]`" +
+      ((stdout) ? "\nLast change: " + stdout : ""),
+      as_user: true
+    });
   });
 })
 controller.on('user_change', function (bot, data) {
