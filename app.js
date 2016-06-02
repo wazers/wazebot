@@ -10,7 +10,7 @@ var config = require('./config'),
   controller = Botkit.slackbot({
     // storage: mongoStorage,
     debug: false,
-    port: 4008
+    port: config.server_port
     //include "log: false" to disable logging
     //or a "logLevel" integer from 0 to 7 to adjust logging verbosity
   }),
@@ -447,6 +447,11 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static(static_dir));
 if (typeof config.server_ip === "undefined")
   console.warn('No OPENSHIFT_NODEJS_IP environment variable');
+controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
+// you can pass the tokens as an array, or variable argument list
+//controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN_1', 'AUTH_TOKEN_2');
+// or
+//controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN');
 app.listen(
   config.server_port,
   config.server_ip,
@@ -456,11 +461,6 @@ app.listen(
       config.server_port);
   });
 
-controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
-// you can pass the tokens as an array, or variable argument list
-//controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN_1', 'AUTH_TOKEN_2');
-// or
-//controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN');
 
 function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
   return new Promise(function (fulfill, reject) {
