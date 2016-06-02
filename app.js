@@ -319,7 +319,7 @@ controller.hears(['start ([^ ].*) (.*)', 'start'], 'direct_message', function (b
   // console.log("hello", publicChannel.id);
   // bot.api.chat.postMessage({channel: publicChannel.id, text: ":waze-baby: connected", as_user: true});
 })
-controller.hears('^.*?(?:L([0-7]).*?)?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com\/[^\/]*?\/editor\/\?[^ >]*)(?:.*?L([0-7]))?.*?$', ['direct_message', 'mention', 'ambient'], function (bot, message) {
+controller.hears('^.*?(?:L([0-7]).*?)?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com(?:\/[^\/]*?)?\/editor\/\?[^ >]*)(?:.*?L([0-7]))?.*?$', ['direct_message', 'mention', 'ambient'], function (bot, message) {
   //1 of 3 locklevel, 2 url
   // console.log("triggered", message, "Triggered", decodeURI(message.match[2]), url.parse(decodeURI(message.match[2]).replace(/&amp;/g, '&'), true));
   // bot.reply(message, "Hi!\nThis part's still under construction, please check back later.");
@@ -474,6 +474,7 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
         delete cUrl.query[key];
     }
     delete cUrl.search;
+    cUrl.pathname = "/editor";
     let newUrl = url.format(cUrl);
 
 
