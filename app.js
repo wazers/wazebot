@@ -14,9 +14,9 @@ var config = require('./config'),
     //include "log: false" to disable logging
     //or a "logLevel" integer from 0 to 7 to adjust logging verbosity
   }),
-  express = require('express'),
-  bodyParser = require('body-parser'),
-  app = express(),
+// express = require('express'),
+// bodyParser = require('body-parser'),
+// app = express(),
   geocoderProvider = 'google', httpAdapter = 'http';
 // optional
 /*var extra = {
@@ -439,27 +439,28 @@ controller.on('message_received', function (bot, data) {
 /*
  * Slash command handling
  */
-// controller.setupWebserver(config.server_port, function (err, express_webserver) {
-var static_dir = __dirname + '/public';
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extended: true}));
-app.use(express.static(static_dir));
-if (typeof config.server_ip === "undefined")
-  console.warn('No OPENSHIFT_NODEJS_IP environment variable');
-controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
+controller.setupWebserver(config.server_port, function (err, app) {
+// var static_dir = __dirname + '/public';
+//
+// app.use(bodyParser.json());
+// app.use(bodyParser.urlencoded({extended: true}));
+// app.use(express.static(static_dir));
+// if (typeof config.server_ip === "undefined")
+//   console.warn('No OPENSHIFT_NODEJS_IP environment variable');
+  controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
 // you can pass the tokens as an array, or variable argument list
 //controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN_1', 'AUTH_TOKEN_2');
 // or
 //controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN');
-app.listen(
-  config.server_port,
-  config.server_ip,
-  function () {
-    console.log('** Starting webserver on ' +
-      ((config.server_ip) ? config.server_ip + ':' : 'port ') +
-      config.server_port);
-  });
+// app.listen(
+//   config.server_port,
+//   config.server_ip,
+//   function () {
+//     console.log('** Starting webserver on ' +
+//       ((config.server_ip) ? config.server_ip + ':' : 'port ') +
+//       config.server_port);
+//   });
+});
 
 
 function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
