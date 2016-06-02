@@ -136,7 +136,7 @@ function find(arr, params) {
 function getUserById(id) {
   let t = find(users, {id: id});
   if (t.name) {
-    let n = t.name.indexOf('_');
+    let n = t.name.lastIndexOf('_');
     if (n > 0) {
       t.waze_name = t.name.substring(0, n);
       t.waze_rank = t.name.substring(n + 1);
