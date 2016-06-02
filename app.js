@@ -28,13 +28,13 @@ var geocoder = require('node-geocoder')(geocoderProvider, httpAdapter);//, extra
 var users, channels, groups, team, privateGroup, publicChannel, uLang = {};
 // connect the bot to a stream of messages
 var bot = controller.spawn({
-  token: process.env.SLACK_TOKEN || config.slack.token,
+  token: process.env.SLACK_TOKEN || config.slack.token || "",
   incoming_webhook: {
     url: "https://hooks.slack.com/services/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"
   }
 }).startRTM(function (err, bot, payload) {
   if (err) {
-    throw new Error('Could not connect to Slack');
+    return console.log('Could not connect to Slack');
   }
   users = payload.users;
   channels = payload.channels;
