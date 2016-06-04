@@ -276,10 +276,9 @@ function askLanguagePref(userId) {
     });
   }
 }
-function fillTemplate(str, userId) {
-  var user = getUserById(userId);
+function fillTemplate(str, data) {
   return (str) ? str.replace(/<%(([^%>])*)%>/igm, function (match, p1) {
-    return user[p1] || ((uLang[userId]) ? config.defaults[uLang[userId]].user : config.defaults.en.user);
+    return data[p1] || ((uLang[data.id]) ? config.defaults[uLang[data.id]][p1] : config.defaults.en[p1]) || "unknown " + p1;
   }) : "";
 }
 controller.on('hello', function (bot, data) {
@@ -355,8 +354,8 @@ controller.hears('^.*?(?:L([0-7]).*?)?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com
     rawUrl = decodeURI(message.match[2]).replace(/&amp;/g, '&');
   prettyEditorUrl(getUserById(message.user), lockLevel,
     url.parse(rawUrl, true),
-    ":waze-baby: gebruik bij voorkeur `/closure <level> <url> <bericht>` of `/l <level> <url> <bericht>`." +
-    "\n ```Voorbeeld: /l " + ((lockLevel) ? lockLevel : "1") + " " + rawUrl + " extra informatie```",
+    ":waze-baby: gebruik bij voorkeur `/closure` of `/l`." +
+    "\nVoorbeeld: `/l " + ((lockLevel) ? lockLevel : "1") + " https://waze.com/edit...153&lat=50.9419 extra informatie`",
     "Clean url").then(function (e) {
     // console.log("res", e, "endred");
     bot.reply(message, e);
@@ -376,10 +375,10 @@ controller.on('message_received', function (bot, data) {
   Settings.findOne({key: data.type}).then(function (key) {
     key.types.forEach(function (el) {
       // console.log(data.type, "Found: " + el.usedFor, privateGroup.id, uLang[data.user]);
-      let msg = (uLang[data.user]) ? fillTemplate(find(el.templates, {lang: uLang[data.user]}).template, data.user) : "";
+      let msg = (uLang[data.user]) ? fillTemplate(find(el.templates, {lang: uLang[data.user]}).template, getUserById(data.user)) : "";
       if (msg == "")
         el.templates.forEach(function (t) {
-          msg += fillTemplate(t.template, data.user) + "\n";
+          msg += fillTemplate(t.template, getUserById(data.user)) + "\n";
           // console.log(t.lang, "template");
         });
       // console.log(msg);
@@ -484,11 +483,36 @@ controller.setupWebserver(config.server_port, function (err, app) {
 //   });
 });
 
+function getLangStringByKey(key, lang, templateData) {
+  if (!lang)
+    lang = config.slack.defaultLang;
+  return new Promise(function (fulfill, reject) {
+    Settings.findOne({key: key}).then(function (key) {
+      key.types.forEach(function (el) {
+        // console.log(data.type, "Found: " + el.usedFor, privateGroup.id, uLang[data.user]);
+        let msg = fillTemplate(find(el.templates, {lang: lang}).template, templateData);
+        if (msg == "")
+          el.templates.forEach(function (t) {
+            msg += fillTemplate(t.template, templateData) + "\n";
+            // console.log(t.lang, "template");
+          });
+        // console.log(msg);
+        // console.log("welcomepm loading" + data.user + " lang" + uLang[data.user]);
+        fulfill(msg);
+        // bot.api.chat.postMessage({channel: data.user, text: msg, as_user: true});
+      });
+    }, function (err) {
+      reject("Missing string for key: " + key + ", report this to @jlsjonas.");
+    });
+  });
+}
+
 
 function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
   return new Promise(function (fulfill, reject) {
-    lockLevel = lockLevel || 0;
+    lockLevel = (lockLevel > 0) ? lockLevel : false;
     let lockBase = (lockLevel) ? "L" + lockLevel : "",
+      lockFull = (lockLevel) ? "Level " + lockLevel : "Unknown Level",
       lockDesc = (lockLevel) ? lockBase + "_" : "";
     for (var key in cUrl.query) {
       // skip loop if the property is from prototype
@@ -503,13 +527,15 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
 
     geocoder.reverse({lat: cUrl.query.lat, lon: cUrl.query.lon})
       .then(function (res) {
-        // console.log(res);
+        console.log(res);
 
         geocoder.geocode(res[0].city + ", " + res[0].country)
           .then(function (resCity) {
             // console.log(resCity);
             fulfill({
-              text: lockBase + (quote) ? quote : "",
+              text: ((lockLevel) ? "" : lockFull + ", Region: ") + lockDesc + res[0].administrativeLevels.level2short + " " +
+              lockDesc + res[0].administrativeLevels.level1short + " " +
+              lockDesc + res[0].countryCode + ((quote) ? "\n>" + quote : ""),
               // mrkdwn: true,
               attachments: [
                 {
@@ -519,20 +545,20 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
                   author_name: (cUser.real_name || cUser.name) + ((cUser.waze_rank) ? " (L" + cUser.waze_rank + ")" : ""),
                   author_link: "https://www.waze.com/nl/user/editor/" + cUser.waze_name,
                   author_icon: cUser.profile.image_32,
-                  title: "Waze Editor " + ((lockLevel) ? "Closure/Edit Request" : "Link") + " - " + lockBase,
+                  title: "Go to the Waze Editor " + ((lockLevel) ? "Closure/Edit Request - " : "Link") + lockBase,
                   title_link: newUrl,
-                  text: payload,
+                  text: "> " + payload,
                   fields: [
-                    {
-                      title: ((lockLevel) ? "Region Lock" : "Region"),
-                      value: lockDesc + res[0].administrativeLevels.level2short,
-                      short: true
-                    },
-                    {
-                      title: ((lockLevel) ? "Lock Level" : "Country"),
-                      value: lockDesc + res[0].countryCode,
-                      short: true
-                    },
+                    // {
+                    //   title: ((lockLevel) ? "Region Lock" : "Region"),
+                    //   value: lockDesc + res[0].administrativeLevels.level2short,
+                    //   short: true
+                    // },
+                    // {
+                    //   title: ((lockLevel) ? "Lock Level" : "Country"),
+                    //   value: lockDesc + res[0].countryCode,
+                    //   short: true
+                    // },
                     {
                       title: "Street",
                       value: res[0].streetName,
@@ -562,7 +588,7 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
                   thumb_url: "https://i.imgur.com/as5Xiom.jpg",
                   footer: intent + " (" + res[0].latitude + ", " + res[0].longitude + ")",
                   footer_icon: "https://i.imgur.com/as5Xiom.jpg",
-                  ts: Date.now() / 1000,
+                  // ts: Date.now() / 1000,
                   mrkdwn_in: ["pretext", "text", "fields"]
                 }
               ]

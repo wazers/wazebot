@@ -9,7 +9,8 @@ let merge = require('merge'), env = process.env.NODE_ENV || 'development',
     admins: ['U16V56Z4L'],
     slack: {
       privateGroup: 'wazebotchannel',
-      publicChannel: 'general'
+      publicChannel: 'general',
+      defaultLang: 'nl'
     },
     defaults: {
       en: {
