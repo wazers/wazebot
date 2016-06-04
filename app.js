@@ -351,7 +351,13 @@ controller.hears('^.*?(?:L([0-7]).*?)?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com
   // }
   // let newUrl = url.format(cUrl);
   //cUser, lockLevel, cUrl, payload, intent
-  prettyEditorUrl(getUserById(message.user), message.match[1] || message.match[3], url.parse(decodeURI(message.match[2]).replace(/&amp;/g, '&'), true), ":waze-baby: gebruik bij voorkeur `/closure <level> <url> <bericht>` of `/l <level> <url> <bericht>`.", "Clean url").then(function (e) {
+  let lockLevel = message.match[1] || message.match[3],
+    rawUrl = decodeURI(message.match[2]).replace(/&amp;/g, '&');
+  prettyEditorUrl(getUserById(message.user), lockLevel,
+    url.parse(rawUrl, true),
+    ":waze-baby: gebruik bij voorkeur `/closure <level> <url> <bericht>` of `/l <level> <url> <bericht>`." +
+    "\n ```Voorbeeld: /l " + ((lockLevel) ? lockLevel : "1") + " " + rawUrl + " extra informatie```",
+    "Clean url").then(function (e) {
     // console.log("res", e, "endred");
     bot.reply(message, e);
     // bot.api.chat.postMessage({
@@ -482,7 +488,8 @@ controller.setupWebserver(config.server_port, function (err, app) {
 function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
   return new Promise(function (fulfill, reject) {
     lockLevel = lockLevel || 0;
-    let lockBase = (lockLevel) ? "L" + lockLevel : "";
+    let lockBase = (lockLevel) ? "L" + lockLevel : "",
+      lockDesc = (lockLevel) ? lockBase + "_" : "";
     for (var key in cUrl.query) {
       // skip loop if the property is from prototype
       if (!cUrl.query.hasOwnProperty(key)) continue;
@@ -508,22 +515,46 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
                 {
                   fallback: lockBase + " " + newUrl + "\n" + payload,
                   color: "#36a64f",
-                  pretext: payload,
+                  pretext: "<" + newUrl + "|" + "Go to the editor>",
                   author_name: (cUser.real_name || cUser.name) + ((cUser.waze_rank) ? " (L" + cUser.waze_rank + ")" : ""),
                   author_link: "https://www.waze.com/nl/user/editor/" + cUser.waze_name,
                   author_icon: cUser.profile.image_32,
                   title: "Waze Editor " + ((lockLevel) ? "Closure/Edit Request" : "Link") + " - " + lockBase,
                   title_link: newUrl,
-                  text: res[0].formattedAddress,
+                  text: payload,
                   fields: [
                     {
-                      title: ((lockLevel) ? "Lock Level" : "Country"),
-                      value: lockBase + "_" + res[0].countryCode,
+                      title: ((lockLevel) ? "Region Lock" : "Region"),
+                      value: lockDesc + res[0].administrativeLevels.level2short,
                       short: true
                     },
                     {
-                      title: ((lockLevel) ? "Region Lock" : "Region"),
-                      value: lockBase + "_" + res[0].administrativeLevels.level2short,
+                      title: ((lockLevel) ? "Lock Level" : "Country"),
+                      value: lockDesc + res[0].countryCode,
+                      short: true
+                    },
+                    {
+                      title: "Street",
+                      value: res[0].streetName,
+                      short: true
+                    },
+                    {
+                      title: "City",
+                      value: res[0].city,
+                      short: true
+                    },
+                    {
+                      title: "Country",
+                      value: res[0].country,
+                      short: true
+                    },
+                    // {
+                    //   title: "Nearby address",
+                    //   value: res[0].formattedAddress
+                    // },
+                    {
+                      title: "Slack Profile",
+                      value: "<@" + cUser.id + ">",
                       short: true
                     }
                   ],
@@ -532,7 +563,7 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
                   footer: intent + " (" + res[0].latitude + ", " + res[0].longitude + ")",
                   footer_icon: "https://i.imgur.com/as5Xiom.jpg",
                   ts: Date.now() / 1000,
-                  mrkdwn_in: ["pretext"]
+                  mrkdwn_in: ["pretext", "text", "fields"]
                 }
               ]
             });
