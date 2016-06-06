@@ -29,6 +29,9 @@ var geocoder = require('node-geocoder')(geocoderProvider, httpAdapter);//, extra
 
 var users, channels, groups, team, privateGroup, publicChannel, uLang = {};
 // connect the bot to a stream of messages
+var deleteBot = controller.spawn({
+  token: process.env.SLACK_TEST_TOKEN || process.env.SLACK_TOKEN || config.slack.token || ""
+});
 var bot = controller.spawn({
   token: process.env.SLACK_TOKEN || config.slack.token || "",
   incoming_webhook: {
@@ -141,7 +144,8 @@ function getUserById(id) {
     if (n > 0) {
       t.waze_name = t.name.substring(0, n);
       t.waze_rank = t.name.substring(n + 1);
-    }
+    } else
+      t.waze_name = t.name;
   }
   return t;
 }
@@ -321,10 +325,13 @@ controller.on('team_join', function (bot, data) {
 controller.hears(['start ([^ ].*) (.*)', 'start'], 'direct_message', function (bot, message) {
   bot.reply(message, "Hi!\nThis part's still under construction, please check back later.");
   askLanguagePref(message.user);
-  if (config.admins.indexOf(message.user)) {
+  console.log(message.match[1], message.match[2], "from", message.user, config.admins.indexOf(message.user));
+  if (config.admins.indexOf(message.user) > -1) {
     switch (message.match[1]) {
       case 'asklang':
-        askLanguagePref(getUserByName(message.match[2]).id);
+        let usern = getUserByName(message.match[2]);
+        console.log(usern, "asklang", message.match[1], message.match[2])
+        askLanguagePref(usern.id);
         break;
     }
     // bot.startConversation(message,function(err,conv){
@@ -334,8 +341,24 @@ controller.hears(['start ([^ ].*) (.*)', 'start'], 'direct_message', function (b
   // console.log("hello", publicChannel.id);
   // bot.api.chat.postMessage({channel: publicChannel.id, text: ":waze-baby: connected", as_user: true});
 })
-controller.hears('^(?:.|\n)*?(?:L([0-7])(?:.|\n)*?)?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com(?:\/[^\/]*?)?\/editor\/\?[^\n >]*)(?:(?:.|\n)*?L([0-7]))?(?:.|\n)*$', ['direct_message', 'mention', 'ambient'], function (bot, message) {
-  //1 of 3 locklevel, 2 url
+controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com(?:\/[^\/]*?)?\/editor\/?\?[^\n >]*)>?((?:.|\n)*?)?(?:L([0-7])((?:.|\n)*)?)?$', ['direct_message', 'mention', 'ambient'], function (bot, message) {
+  bot.api.reactions.add({
+    name: "x",
+    channel: message.channel,
+    timestamp: message.ts
+  }, function (err) {
+    if (err)
+      console.log("error during remove-flag", err);
+    deleteBot.api.chat.delete({
+      channel: message.channel,
+      ts: message.ts,
+      as_user: true
+    }, function (err, res) {
+      if (err)
+        console.log("error during remove", err, message.channel, message.ts);
+    });
+  });
+  //2 of 6 locklevel, 4 url
   // console.log("triggered", message, "Triggered", decodeURI(message.match[2]), url.parse(decodeURI(message.match[2]).replace(/&amp;/g, '&'), true));
   // bot.reply(message, "Hi!\nThis part's still under construction, please check back later.");
   // console.log("hello", publicChannel.id);
@@ -350,21 +373,23 @@ controller.hears('^(?:.|\n)*?(?:L([0-7])(?:.|\n)*?)?((?:(?:http[s]?|ftp):\/)?\/?
   // }
   // let newUrl = url.format(cUrl);
   //cUser, lockLevel, cUrl, payload, intent
-  let lockLevel = message.match[1] || message.match[3],
-    rawUrl = decodeURI(message.match[2]).replace(/&amp;/g, '&');
+  let lockLevel = message.match[2] || message.match[6],
+    rawUrl = decodeURI(message.match[4]).replace(/&amp;/g, '&');
   prettyEditorUrl(getUserById(message.user), lockLevel,
     url.parse(rawUrl, true),
-    ":waze-baby: gebruik bij voorkeur `/closure` of `/l`." +
-    "\nVoorbeeld: `/l " + ((lockLevel) ? lockLevel : "1") + " https://waze.com/edit...153&lat=50.9419 extra informatie`",
-    "Clean url").then(function (e) {
-    // console.log("res", e, "endred");
-    bot.reply(message, e);
-    // bot.api.chat.postMessage({
-    //   channel: message.channel,
-    //   text: ":waze-baby: clean url: " + newUrl + "\ngebruik `/closure <level> <url> <bericht>` of `/l <level> <url> <bericht>` voor een rijkere weergave.",
-    //   as_user: true
-    // });
-  });
+    (message.match[1] + ((message.match[2]) ? "L" + message.match[2] : "") + message.match[3] + message.match[5] + ((message.match[6]) ? "L" + message.match[6] : "") + message.match[7]).replace(/undefined/g, "").replace(/\n/g, "\n> "),
+    "Clean url",
+    ((process.env.SLACK_TEST_TOKEN) ? "" : ":waze-baby: gebruik bij voorkeur `/closure` of `/l`." +
+    "\nVoorbeeld: `/l " + ((lockLevel) ? lockLevel : "1") + " https://waze.com/edit...153&lat=50.9419 extra informatie`"))
+    .then(function (e) {
+      // console.log("res", e, "endred");
+      bot.reply(message, e);
+      // bot.api.chat.postMessage({
+      //   channel: message.channel,
+      //   text: ":waze-baby: clean url: " + newUrl + "\ngebruik `/closure <level> <url> <bericht>` of `/l <level> <url> <bericht>` voor een rijkere weergave.",
+      //   as_user: true
+      // });
+    });
 })
 // bot.on('message', function(data) {
 controller.on('message_received', function (bot, data) {
@@ -527,11 +552,9 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
 
     geocoder.reverse({lat: cUrl.query.lat, lon: cUrl.query.lon})
       .then(function (res) {
-        console.log(res);
 
         geocoder.geocode(res[0].city + ", " + res[0].country)
           .then(function (resCity) {
-            // console.log(resCity);
             fulfill({
               text: ((lockLevel) ? "" : lockFull + ", Region: ") + lockDesc + res[0].administrativeLevels.level2short + " " +
               lockDesc + res[0].administrativeLevels.level1short + " " +
@@ -541,11 +564,11 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
                 {
                   fallback: lockBase + " " + newUrl + "\n" + payload,
                   color: "#36a64f",
-                  pretext: "<" + newUrl + "|" + "Go to the editor>",
+                  pretext: "<" + newUrl + "|" + "Go to the editor>, Slack profile: <@" + cUser.id + ">",
                   author_name: (cUser.real_name || cUser.name) + ((cUser.waze_rank) ? " (L" + cUser.waze_rank + ")" : ""),
                   author_link: "https://www.waze.com/nl/user/editor/" + cUser.waze_name,
                   author_icon: cUser.profile.image_32,
-                  title: "Go to the Waze Editor " + ((lockLevel) ? "Closure/Edit Request - " : "Link") + lockBase,
+                  title: "Go to the Waze Editor " + ((lockLevel) ? "Closure/Edit/Unlock Request - " : "Link") + lockBase,
                   title_link: newUrl,
                   text: "> " + payload,
                   fields: [
@@ -565,31 +588,31 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
                       short: true
                     },
                     {
-                      title: "City",
-                      value: res[0].city,
+                      title: "City, Country",
+                      value: res[0].city + ", " + res[0].country,
                       short: true
                     },
-                    {
-                      title: "Country",
-                      value: res[0].country,
-                      short: true
-                    },
+                    // {
+                    //   title: "Country",
+                    //   value: res[0].country,
+                    //   short: true
+                    // },
                     // {
                     //   title: "Nearby address",
                     //   value: res[0].formattedAddress
                     // },
-                    {
-                      title: "Slack Profile",
-                      value: "<@" + cUser.id + ">",
-                      short: true
-                    }
+                    // {
+                    //   title: "Slack Profile",
+                    //   value: "<@" + cUser.id + ">",
+                    //   short: true
+                    // }
                   ],
-                  image_url: "http://maps.googleapis.com/maps/api/staticmap?autoscale=2&size=600x300&maptype=terrain&format=png&visual_refresh=true&markers=size:mid%7Ccolor:0xff0000%7Clabel:%7C" + cUrl.query.lat + "," + cUrl.query.lon + "&markers=size:tiny%7Ccolor:0xff0000%7Clabel:0%7C" + resCity[0].latitude + "," + resCity[0].longitude,
+                  image_url: "http://maps.googleapis.com/maps/api/staticmap?autoscale=2&size=400x175&maptype=terrain&format=png&visual_refresh=true&markers=size:mid%7Ccolor:0xff0000%7Clabel:%7C" + cUrl.query.lat + "," + cUrl.query.lon + "&markers=size:tiny%7Ccolor:0xff0000%7Clabel:0%7C" + resCity[0].latitude + "," + resCity[0].longitude,
                   thumb_url: "https://i.imgur.com/as5Xiom.jpg",
                   footer: intent + " (" + res[0].latitude + ", " + res[0].longitude + ")",
                   footer_icon: "https://i.imgur.com/as5Xiom.jpg",
                   // ts: Date.now() / 1000,
-                  mrkdwn_in: ["pretext", "text", "fields"]
+                  mrkdwn_in: ["pretext", "text"]
                 }
               ]
             });
