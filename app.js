@@ -297,7 +297,7 @@ controller.on('hello', function (bot, data) {
       as_user: true
     });
   });
-  exec("git log -1 --pretty='`%s` by <mailto:%cE|%cN>%-b%nSigned by: %GS %G?%nNotes: %N' | cat", function (error, stdout, stderr) {
+  exec("git log -1 --pretty='`%s` by <mailto:%cE|%cN>%n%-b%nSigned by: %GS %G?%nNotes: %N' | cat", function (error, stdout, stderr) {
     if (error || stderr)
       console.warn(error || stderr);
     bot.api.chat.postMessage({
@@ -342,21 +342,13 @@ controller.hears(['start ([^ ].*) (.*)', 'start'], 'direct_message', function (b
   // bot.api.chat.postMessage({channel: publicChannel.id, text: ":waze-baby: connected", as_user: true});
 })
 controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com(?:\/[^\/]*?)?\/editor\/?\?[^\n >]*)>?((?:.|\n)*?)?(?:L([0-7])((?:.|\n)*)?)?$', ['direct_message', 'mention', 'ambient'], function (bot, message) {
-  bot.api.reactions.add({
-    name: "x",
+  deleteBot.api.chat.delete({
     channel: message.channel,
-    timestamp: message.ts
-  }, function (err) {
+    ts: message.ts,
+    as_user: true
+  }, function (err, res) {
     if (err)
-      console.log("error during remove-flag", err);
-    deleteBot.api.chat.delete({
-      channel: message.channel,
-      ts: message.ts,
-      as_user: true
-    }, function (err, res) {
-      if (err)
-        console.log("error during remove", err, message.channel, message.ts);
-    });
+      console.log("error during remove", err, message.channel, message.ts);
   });
   //2 of 6 locklevel, 4 url
   // console.log("triggered", message, "Triggered", decodeURI(message.match[2]), url.parse(decodeURI(message.match[2]).replace(/&amp;/g, '&'), true));
