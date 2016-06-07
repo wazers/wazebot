@@ -6,6 +6,7 @@ var config = require('./config'),
   exec = require('child_process').exec,
   Botkit = require('botkit'),
   url = require('url'),
+  Twit = require('twit'),
   allowedUrlKeys = ["env", "lon", "lat", "zoom", "segments", "nodes", "cameras", "mapUpdateRequest", "mapProblem", "venues"],
 // mongoStorage = require('botkit-storage-mongo')({mongoUri: 'mongodb://localhost/botkit'}),
   controller = Botkit.slackbot({
@@ -14,6 +15,11 @@ var config = require('./config'),
     port: config.server_port
     //include "log: false" to disable logging
     //or a "logLevel" integer from 0 to 7 to adjust logging verbosity
+  }),
+  T = new Twit({
+    consumer_key: process.env.TWITTER_KEY || "",
+    consumer_secret: process.env.TWITTER_SECRET || "",
+    app_only_auth: true
   }),
 // express = require('express'),
 // bodyParser = require('body-parser'),
@@ -369,18 +375,20 @@ controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:http[s]?|ftp):\
     rawUrl = decodeURI(message.match[4]).replace(/&amp;/g, '&');
   prettyEditorUrl(getUserById(message.user), lockLevel,
     url.parse(rawUrl, true),
-    (message.match[1] + ((message.match[2]) ? "L" + message.match[2] : "") + message.match[3] + message.match[5] + ((message.match[6]) ? "L" + message.match[6] : "") + message.match[7]).replace(/undefined/g, "").replace(/\n/g, "\n> "),
+    (message.match[1] + ((message.match[2]) ? "L" + message.match[2] : "") + message.match[3] + message.match[5] + ((message.match[6]) ? "L" + message.match[6] : "") + message.match[7]).replace(/undefined/g, ""),
     "Clean url",
     ((process.env.SLACK_TEST_TOKEN) ? "" : ":waze-baby: gebruik bij voorkeur `/closure` of `/l`." +
     "\nVoorbeeld: `/l " + ((lockLevel) ? lockLevel : "1") + " https://waze.com/edit...153&lat=50.9419 extra informatie`"))
     .then(function (e) {
-      // console.log("res", e, "endred");
       bot.reply(message, e);
       // bot.api.chat.postMessage({
       //   channel: message.channel,
       //   text: ":waze-baby: clean url: " + newUrl + "\ngebruik `/closure <level> <url> <bericht>` of `/l <level> <url> <bericht>` voor een rijkere weergave.",
       //   as_user: true
       // });
+    }).catch(function (err) {
+    console.log("pretty-error", err);
+    bot.reply(message, message);
     });
 })
 // bot.on('message', function(data) {
@@ -529,7 +537,7 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
   return new Promise(function (fulfill, reject) {
     lockLevel = (lockLevel > 0) ? lockLevel : false;
     let lockBase = (lockLevel) ? "L" + lockLevel : "",
-      lockFull = (lockLevel) ? "Level " + lockLevel : "Unknown Level",
+      lockFull = (lockLevel) ? "Level " + lockLevel + ", " : "",
       lockDesc = (lockLevel) ? lockBase + "_" : "";
     for (var key in cUrl.query) {
       // skip loop if the property is from prototype
@@ -539,7 +547,10 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
     }
     delete cUrl.search;
     cUrl.pathname = "/editor";
-    let newUrl = url.format(cUrl);
+    let newUrl = url.format(cUrl),
+      cSegments = (cUrl.query.segments) ? cUrl.query.segments.split(",").length : 0,
+      extraVal = ((cUrl.query.mapUpdateRequest) ? " UR" : "") + ((cUrl.query.mapProblem) ? " MP" : "")
+        + ((cUrl.query.venues) ? " Place" : "");
 
 
     geocoder.reverse({lat: cUrl.query.lat, lon: cUrl.query.lon})
@@ -547,67 +558,89 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
 
         geocoder.geocode(res[0].city + ", " + res[0].country)
           .then(function (resCity) {
-            fulfill({
-              text: ((lockLevel) ? "" : lockFull + ", Region: ") + lockDesc + res[0].administrativeLevels.level2short + " " +
-              lockDesc + res[0].administrativeLevels.level1short + " " +
-              lockDesc + res[0].countryCode + ((quote) ? "\n>" + quote : ""),
-              // mrkdwn: true,
+            let whosFirst = res[0].administrativeLevels.level2short.length < res[0].administrativeLevels.level1short.length,
+              twitterMatch = payload.match(/<?https?:\/\/twitter\.com\/(?:#!\/)?(\w+)\/status(?:es)?\/(\d+)>?/i);
+            console.log("twitter", twitterMatch, "twitter");
+            if (twitterMatch)
+              payload = payload.replace(twitterMatch[0], "");
+            let retMsg = {
+              text: lockDesc + ((whosFirst) ? res[0].administrativeLevels.level2short : res[0].administrativeLevels.level1short) + " <@" + cUser.id + ">: " +
+              payload.substr(0, (payload.indexOf("\n") > 0) ? payload.indexOf("\n") : 20) + ((payload.length > 20) ? "..." : "") + "\n" +
+              ((lockLevel) ? "" : lockFull + "Region: ") + lockDesc +
+              ((whosFirst) ? res[0].administrativeLevels.level1short : res[0].administrativeLevels.level2short) + " " +
+              lockDesc + res[0].countryCode + ", <https://www.waze.com/nl/user/editor/" + cUser.waze_name + "|Waze profile>",
+              mrkdwn: true,
+              unfurl_links: true,
               attachments: [
                 {
-                  fallback: lockBase + " " + newUrl + "\n" + payload,
-                  color: "#36a64f",
-                  pretext: "<" + newUrl + "|" + "Go to the editor>, Slack profile: <@" + cUser.id + ">",
+                  fallback: "<" + newUrl + "|" + "Go to the editor> " + lockBase + "\n" + payload,
+                  color: "#439FE0",
+                  pretext: ((quote) ? ">" + quote : ""),//Slack profile: <@" + cUser.id + ">",
                   author_name: (cUser.real_name || cUser.name) + ((cUser.waze_rank) ? " (L" + cUser.waze_rank + ")" : ""),
-                  author_link: "https://www.waze.com/nl/user/editor/" + cUser.waze_name,
+                  author_link: "<@" + cUser.id + ">",//"https://www.waze.com/nl/user/editor/" + cUser.waze_name,
                   author_icon: cUser.profile.image_32,
                   title: "Go to the Waze Editor " + ((lockLevel) ? "Closure/Edit/Unlock Request - " : "Link") + lockBase,
                   title_link: newUrl,
-                  text: "> " + payload,
+                  text: (payload.length > 20) ? payload : "",
                   fields: [
-                    // {
-                    //   title: ((lockLevel) ? "Region Lock" : "Region"),
-                    //   value: lockDesc + res[0].administrativeLevels.level2short,
-                    //   short: true
-                    // },
-                    // {
-                    //   title: ((lockLevel) ? "Lock Level" : "Country"),
-                    //   value: lockDesc + res[0].countryCode,
-                    //   short: true
-                    // },
                     {
-                      title: "Street",
-                      value: res[0].streetName,
+                      title: "Address",
+                      value: res[0].formattedAddress
+                    },
+                    {
+                      title: (cUrl.query.nodes) ? "nodes" : ((cSegments > 0) ? "segments" : (cUrl.query.cameras) ? "camera's" : ""),
+                      value: (cUrl.query.nodes) ? cUrl.query.nodes.split(",").length :
+                        ((cSegments > 0) ? cSegments : ((cUrl.query.cameras) ? cUrl.query.cameras.split(",").length : "")),
                       short: true
                     },
                     {
-                      title: "City, Country",
-                      value: res[0].city + ", " + res[0].country,
+                      title: (extraVal) ? "extra" : "",
+                      value: extraVal,
                       short: true
-                    },
-                    // {
-                    //   title: "Country",
-                    //   value: res[0].country,
-                    //   short: true
-                    // },
-                    // {
-                    //   title: "Nearby address",
-                    //   value: res[0].formattedAddress
-                    // },
-                    // {
-                    //   title: "Slack Profile",
-                    //   value: "<@" + cUser.id + ">",
-                    //   short: true
-                    // }
+                    }
                   ],
-                  image_url: "http://maps.googleapis.com/maps/api/staticmap?autoscale=2&size=400x175&maptype=terrain&format=png&visual_refresh=true&markers=size:mid%7Ccolor:0xff0000%7Clabel:%7C" + cUrl.query.lat + "," + cUrl.query.lon + "&markers=size:tiny%7Ccolor:0xff0000%7Clabel:0%7C" + resCity[0].latitude + "," + resCity[0].longitude,
-                  thumb_url: "https://i.imgur.com/as5Xiom.jpg",
+                  // image_url: "http://maps.googleapis.com/maps/api/staticmap?autoscale=2&size=400x175&maptype=terrain&format=png&visual_refresh=true&markers=size:mid%7Ccolor:0xff0000%7Clabel:%7C" + cUrl.query.lat + "," + cUrl.query.lon + "&markers=size:tiny%7Ccolor:0xff0000%7Clabel:0%7C" + resCity[0].latitude + "," + resCity[0].longitude,
+                  thumb_url: "http://maps.googleapis.com/maps/api/staticmap?autoscale=2&size=75x75&maptype=terrain&format=png&visual_refresh=true&markers=size:mid%7Ccolor:0xff0000%7Clabel:%7C" + cUrl.query.lat + "," + cUrl.query.lon + "&markers=size:tiny%7Ccolor:0xff0000%7Clabel:0%7C" + resCity[0].latitude + "," + resCity[0].longitude,//"https://i.imgur.com/as5Xiom.jpg",
                   footer: intent + " (" + res[0].latitude + ", " + res[0].longitude + ")",
                   footer_icon: "https://i.imgur.com/as5Xiom.jpg",
                   // ts: Date.now() / 1000,
                   mrkdwn_in: ["pretext", "text"]
                 }
               ]
-            });
+            };
+            if (twitterMatch) {
+              T.get('statuses/show/:id', {id: twitterMatch[2]})
+                .catch(function (err) {
+                  console.log('caught error', err.stack);
+                  fulfill(retMsg);
+                })
+                .then(function (res) {
+                  try {
+                    let tres = res.data;
+                    tres.text = tres.text.replace(/@(\w+)(?: |\n|$)/g, "<https://twitter.com/$1|$&>");
+                    console.log(tres);
+                    retMsg.attachments.push({
+                      fallback: "Tweet: " + tres.text + "\nFrom:" + tres.user.screen_name,
+                      color: "#55acee",
+                      author_icon: tres.user.profile_image_url,
+                      author_link: tres.user.url,
+                      author_name: tres.user.name + " @" + tres.user.screen_name,
+                      text: ((tres.possibly_sensitive) ? "\n\nPossibly sensitive tweet,\nplease click on _Read more_ to view\n\n\n" : "") +
+                      tres.text + ((tres.quoted_status) ? "\n><https://twitter.com/" + tres.quoted_status.user.screen_name +
+                      "|@" + tres.quoted_status.user.screen_name + ">:\n> " + tres.quoted_status.text : ""),
+                      footer: "<https://twitter.com/" + tres.user.screen_name + "/status/" + tres.id_str + "|" +
+                      ((tres.retweeted) ? "Retweet" : "Tweet") + ">",
+                      footer_icon: "https://g.twimg.com/about/feature-corporate/image/twitterbird_RGB.png",
+                      ts: new Date(tres.created_at) / 1000,
+                      mrkdwn_in: ["text"]
+                    });
+                    fulfill(retMsg);
+                  } catch (e) {
+                    console.log("twitter parse error", e);
+                  }
+                });
+            } else
+              fulfill(retMsg);
           })
           .catch(function (err) {
             console.log(err);
