@@ -21,9 +21,9 @@ var config = require('./config'),
     consumer_secret: process.env.TWITTER_SECRET || "",
     app_only_auth: true
   }),
-// express = require('express'),
-// bodyParser = require('body-parser'),
-// app = express(),
+  express = require('express'),
+  bodyParser = require('body-parser'),
+  app = express(),
   geocoderProvider = 'google', httpAdapter = 'http';
 // optional
 /*var extra = {
@@ -322,7 +322,22 @@ controller.on('hello', function (bot, data) {
         as_user: true
       });
       bot.closeRTM();
+      console.log("RTM connection closing...");
+      setTimeout(function () {
+        bot.destroy();
+        console.log("Bot destroyed, ending process");
+        process.exit(0);
+      }, 2500);
+      app.server.close(function () {
+        console.log('Stopped listening on ' + config.server_port);
+      });
     }, 15000);
+})
+controller.on('rtm_open', function (bot, data) {
+  console.log("rtm opened", data);
+})
+controller.on('rtm_close', function (bot, data) {
+  console.log("rtm closed", data);
 })
 controller.on('user_change', function (bot, data) {
   users[users.findIndex(function (el) {
@@ -495,12 +510,20 @@ controller.on('message_received', function (bot, data) {
 /*
  * Slash command handling
  */
-controller.setupWebserver(config.server_port, function (err, app) {
-// var static_dir = __dirname + '/public';
-//
-// app.use(bodyParser.json());
-// app.use(bodyParser.urlencoded({extended: true}));
-// app.use(express.static(static_dir));
+// controller.setupWebserver(config.server_port, function (err, app) {
+var static_dir = __dirname + '/public';
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(express.static(static_dir));
+app.server = app.listen(
+  config.server_port,
+  config.server_ip,
+  function () {
+    console.log('** Starting webserver on ' +
+      ((config.server_ip) ? config.server_ip + ':' : 'port ') +
+      config.server_port);
+  });
 // if (typeof config.server_ip === "undefined")
 //   console.warn('No OPENSHIFT_NODEJS_IP environment variable');
   controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
@@ -508,15 +531,7 @@ controller.setupWebserver(config.server_port, function (err, app) {
 //controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN_1', 'AUTH_TOKEN_2');
 // or
 //controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN');
-// app.listen(
-//   config.server_port,
-//   config.server_ip,
-//   function () {
-//     console.log('** Starting webserver on ' +
-//       ((config.server_ip) ? config.server_ip + ':' : 'port ') +
-//       config.server_port);
-//   });
-});
+// });
 
 function getLangStringByKey(key, lang, templateData) {
   if (!lang)
