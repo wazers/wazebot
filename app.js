@@ -347,7 +347,7 @@ controller.hears(['start ([^ ].*) (.*)', 'start'], 'direct_message', function (b
   // console.log("hello", publicChannel.id);
   // bot.api.chat.postMessage({channel: publicChannel.id, text: ":waze-baby: connected", as_user: true});
 })
-controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:http[s]?|ftp):\/)?\/?www\.waze\.com(?:\/[^\/]*?)?\/editor\/?\?[^\n >]*)>?((?:.|\n)*?)?(?:L([0-7])((?:.|\n)*)?)?$', ['direct_message', 'mention', 'ambient'], function (bot, message) {
+controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:https?|ftp):\/)?\/?(?:www\.)?waze\.com(?:\/[^\/]*?)?\/editor\/?\?[^\n >]*)>?((?:.|\n)*?)?(?:L([0-7])((?:.|\n)*)?)?$', ['direct_message', 'mention', 'ambient'], function (bot, message) {
   deleteBot.api.chat.delete({
     channel: message.channel,
     ts: message.ts,
@@ -389,7 +389,7 @@ controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:http[s]?|ftp):\
     }).catch(function (err) {
     console.log("pretty-error", err);
     bot.reply(message, message);
-    });
+  });
 })
 // bot.on('message', function(data) {
 controller.on('message_received', function (bot, data) {
@@ -538,19 +538,29 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
     lockLevel = (lockLevel > 0) ? lockLevel : false;
     let lockBase = (lockLevel) ? "L" + lockLevel : "",
       lockFull = (lockLevel) ? "Level " + lockLevel + ", " : "",
-      lockDesc = (lockLevel) ? lockBase + "_" : "";
+      lockDesc = (lockLevel) ? lockBase + "_" : "",
+      lockMark = (lockLevel) ? lockBase + "!" : "",
+      warningMessage = "",
+      cSegments = (cUrl.query.segments) ? cUrl.query.segments.split(",").length : 0,
+      cNodes = (cUrl.query.nodes) ? cUrl.query.nodes.split(",").length : 0,
+      cCameras = (cUrl.query.cameras) ? cUrl.query.cameras.split(",").length : 0,
+      cUR = cUrl.query.mapUpdateRequest,
+      cMP = cUrl.query.mapProblem,
+      cVen = cUrl.query.venues,
+      longPayload = payload.length > 50;
     for (var key in cUrl.query) {
       // skip loop if the property is from prototype
       if (!cUrl.query.hasOwnProperty(key)) continue;
       if (allowedUrlKeys.indexOf(key) == -1)
         delete cUrl.query[key];
     }
+    if (cUrl.query.zoom < 3 && (cSegments || cNodes || cCameras)) {
+      warningMessage += "\n:warning: Url contained zoom " + cUrl.query.zoom + " and " + ((cSegments) ? "segments" : (cNodes) ? "nodes" : (cCameras) ? "cameras" : "") + ", zoom set to 3 :warning:";
+      cUrl.query.zoom = 3;
+    }
     delete cUrl.search;
     cUrl.pathname = "/editor";
-    let newUrl = url.format(cUrl),
-      cSegments = (cUrl.query.segments) ? cUrl.query.segments.split(",").length : 0,
-      extraVal = ((cUrl.query.mapUpdateRequest) ? " UR" : "") + ((cUrl.query.mapProblem) ? " MP" : "")
-        + ((cUrl.query.venues) ? " Place" : "");
+    let newUrl = url.format(cUrl);
 
 
     geocoder.reverse({lat: cUrl.query.lat, lon: cUrl.query.lon})
@@ -564,47 +574,44 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
             if (twitterMatch)
               payload = payload.replace(twitterMatch[0], "");
             let retMsg = {
-              text: lockDesc + ((whosFirst) ? res[0].administrativeLevels.level2short : res[0].administrativeLevels.level1short) + " <@" + cUser.id + ">: " +
-              payload.substr(0, (payload.indexOf("\n") > 0) ? payload.indexOf("\n") : 20) + ((payload.length > 20) ? "..." : "") + "\n" +
-              ((lockLevel) ? "" : lockFull + "Region: ") + lockDesc +
+              text: lockDesc + ((whosFirst) ? res[0].administrativeLevels.level2short : res[0].administrativeLevels.level1short) +
+              " <@" + cUser.id + ">: " + ((longPayload) ? "_" : "") +
+              payload.substr(0, (payload.indexOf("\n") > 0) ? payload.indexOf("\n") : 50) + ((longPayload) ? "..._" : "") + "\n" +
+              ((lockLevel) ? "" : lockFull + "Region: ") + lockDesc + res[0].city + " " + lockDesc +
               ((whosFirst) ? res[0].administrativeLevels.level1short : res[0].administrativeLevels.level2short) + " " +
-              lockDesc + res[0].countryCode + ", <https://www.waze.com/nl/user/editor/" + cUser.waze_name + "|Waze profile>",
+              lockDesc + res[0].countryCode,
               mrkdwn: true,
               unfurl_links: true,
               attachments: [
                 {
                   fallback: "<" + newUrl + "|" + "Go to the editor> " + lockBase + "\n" + payload,
                   color: "#439FE0",
-                  pretext: ((quote) ? ">" + quote : ""),//Slack profile: <@" + cUser.id + ">",
+                  pretext: ((quote) ? ">" + quote : "") + warningMessage,//Slack profile: <@" + cUser.id + ">",
                   author_name: (cUser.real_name || cUser.name) + ((cUser.waze_rank) ? " (L" + cUser.waze_rank + ")" : ""),
                   author_link: "<@" + cUser.id + ">",//"https://www.waze.com/nl/user/editor/" + cUser.waze_name,
                   author_icon: cUser.profile.image_32,
-                  title: "Go to the Waze Editor " + ((lockLevel) ? "Closure/Edit/Unlock Request - " : "Link") + lockBase,
+                  title: "Go to the Waze Editor - " + ((lockLevel) ? "Closure/Edit/Unlock Request - " : "Link") + lockMark,
                   title_link: newUrl,
-                  text: (payload.length > 20) ? payload : "",
+                  text: (longPayload) ? payload : "",
                   fields: [
                     {
-                      title: "Address",
-                      value: res[0].formattedAddress
+                      value: "*Area* " + res[0].formattedAddress
                     },
                     {
-                      title: (cUrl.query.nodes) ? "nodes" : ((cSegments > 0) ? "segments" : (cUrl.query.cameras) ? "camera's" : ""),
-                      value: (cUrl.query.nodes) ? cUrl.query.nodes.split(",").length :
-                        ((cSegments > 0) ? cSegments : ((cUrl.query.cameras) ? cUrl.query.cameras.split(",").length : "")),
-                      short: true
-                    },
-                    {
-                      title: (extraVal) ? "extra" : "",
-                      value: extraVal,
-                      short: true
+                      value: "*" + ((cUrl.query.nodes) ? cNodes + " node" + ((cNodes > 1) ? "s" : "") :
+                        ((cSegments > 0) ? cSegments + " segment" + ((cSegments > 1) ? "s" : "") :
+                          (cUrl.query.cameras) ? cCameras + " camera" + ((cCameras > 1) ? "s" : "") :
+                            ((cVen) ? "Place" : ""))) + ((cUR || cMP) ? "* with a" : "*") +
+                      ((cUR) ? "n *Update Request*" : "") + ((cMP) ? " *Map Problem*" : "")
                     }
                   ],
                   // image_url: "http://maps.googleapis.com/maps/api/staticmap?autoscale=2&size=400x175&maptype=terrain&format=png&visual_refresh=true&markers=size:mid%7Ccolor:0xff0000%7Clabel:%7C" + cUrl.query.lat + "," + cUrl.query.lon + "&markers=size:tiny%7Ccolor:0xff0000%7Clabel:0%7C" + resCity[0].latitude + "," + resCity[0].longitude,
                   thumb_url: "http://maps.googleapis.com/maps/api/staticmap?autoscale=2&size=75x75&maptype=terrain&format=png&visual_refresh=true&markers=size:mid%7Ccolor:0xff0000%7Clabel:%7C" + cUrl.query.lat + "," + cUrl.query.lon + "&markers=size:tiny%7Ccolor:0xff0000%7Clabel:0%7C" + resCity[0].latitude + "," + resCity[0].longitude,//"https://i.imgur.com/as5Xiom.jpg",
-                  footer: intent + " (" + res[0].latitude + ", " + res[0].longitude + ")",
+                  footer: intent + " (" + res[0].latitude + ", " + res[0].longitude + ")" +
+                  ", <https://www.waze.com/nl/user/editor/" + cUser.waze_name + "|Waze profile>",
                   footer_icon: "https://i.imgur.com/as5Xiom.jpg",
                   // ts: Date.now() / 1000,
-                  mrkdwn_in: ["pretext", "text"]
+                  mrkdwn_in: ["pretext", "text", "fields"]
                 }
               ]
             };
