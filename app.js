@@ -11,7 +11,7 @@ var config = require('./config'),
 // mongoStorage = require('botkit-storage-mongo')({mongoUri: 'mongodb://localhost/botkit'}),
   controller = Botkit.slackbot({
     // storage: mongoStorage,
-    debug: false,
+    debug: (process.env.CI),
     port: config.server_port
     //include "log: false" to disable logging
     //or a "logLevel" integer from 0 to 7 to adjust logging verbosity
@@ -66,7 +66,7 @@ require('./schemes');
 var usersColl;
 MongoClient.connect(config.dburi, function (err, db) {
   if (err)
-    return console.warn(err);
+    throw new Error(err);
   console.log("Connected correctly to server");
   usersColl = db.collection('users');
   //TODO embed in users[]
@@ -299,7 +299,8 @@ controller.on('hello', function (bot, data) {
     bot.api.chat.postMessage({
       channel: publicChannel.id,
       text: ":waze-baby: Hi, I've just (re)connected; automatic link cleanups should work again; although you should use `/closure [level] [url] [extra info]` and/or `/l [level] [url] [extra info]`" +
-      ((stdout) ? "\nLast change: " + stdout : ""),
+      ((stdout) ? "\nLast change: " + stdout : "") +
+      ((process.env.CI) ? "\nTesting " + process.env.SNAP_COMMIT_SHORT + " stage " + process.env.SNAP_STAGE_NAME + " on *" + process.env.SNAP_BRANCH + "* branch" : ""),
       as_user: true
     });
   });
@@ -313,6 +314,15 @@ controller.on('hello', function (bot, data) {
       as_user: true
     });
   });
+  if (process.env.CI)
+    setTimeout(function () {
+      bot.api.chat.postMessage({
+        channel: privateGroup.id,
+        text: "Connected for 15 seconds, ending connection.",
+        as_user: true
+      });
+      bot.closeRTM();
+    }, 15000);
 })
 controller.on('user_change', function (bot, data) {
   users[users.findIndex(function (el) {
