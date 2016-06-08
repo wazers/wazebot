@@ -319,6 +319,10 @@ controller.on('hello', function (bot, data) {
       channel: privateGroup.id,
       text: "Testing message, automated. https://www.waze.com/editor?env=row&lon=3.61973&lat=50.87647&zoom=3&segments=212456725%2C212456726%2C212457016%2C88111055%2C191987044%2C151451961%2C88141039&mapUpdateRequest=6241911 https://twitter.com/WazeBelgium/status/740174249604812804 an example message including both a tweet (with quote) and an editor url. L1",
       as_user: true
+    }, function (err, msg) {
+      if (err || (msg && !msg.ok))
+        throw new Error('Unable to send test message using SLACK_TEST_TOKEN');
+      console.log(msg);
     });
     setTimeout(function () {
       bot.api.chat.postMessage({
@@ -385,7 +389,10 @@ controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:https?|ftp):\/)
     as_user: true
   }, function (err, res) {
     if (err)
-      console.log("error during remove", err, message.channel, message.ts);
+      if (process.env.CI)
+        throw new Error("error deleting message", err, res);
+      else
+        console.log("error during remove", err, message.channel, message.ts);
   });
   //2 of 6 locklevel, 4 url
   // console.log("triggered", message, "Triggered", decodeURI(message.match[2]), url.parse(decodeURI(message.match[2]).replace(/&amp;/g, '&'), true));
@@ -412,14 +419,11 @@ controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:https?|ftp):\/)
     "\nVoorbeeld: `/l " + ((lockLevel) ? lockLevel : "1") + " https://waze.com/edit...153&lat=50.9419 extra informatie`"))
     .then(function (e) {
       bot.reply(message, e);
-      // bot.api.chat.postMessage({
-      //   channel: message.channel,
-      //   text: ":waze-baby: clean url: " + newUrl + "\ngebruik `/closure <level> <url> <bericht>` of `/l <level> <url> <bericht>` voor een rijkere weergave.",
-      //   as_user: true
-      // });
     }).catch(function (err) {
     console.log("pretty-error", err);
     bot.reply(message, message);
+    if (process.env.CI)
+      throw new Error('Failed to prettify message', err, message);
   });
 })
 // bot.on('message', function(data) {
@@ -532,7 +536,7 @@ app.server = app.listen(
   });
 // if (typeof config.server_ip === "undefined")
 //   console.warn('No OPENSHIFT_NODEJS_IP environment variable');
-  controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
+controller.createWebhookEndpoints(app, ['DWINXvU7SwBe4CcjIhZYbMda', 'bTBacffEs5A4ZuxDKeuNyuIZ', 'suqfMGxEr3u58ZW0uaihYeEP']);
 // you can pass the tokens as an array, or variable argument list
 //controller.createWebhookEndpoints(express_webserver, 'AUTH_TOKEN_1', 'AUTH_TOKEN_2');
 // or
@@ -601,7 +605,6 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
           .then(function (resCity) {
             let whosFirst = res[0].administrativeLevels.level2short.length < res[0].administrativeLevels.level1short.length,
               twitterMatch = payload.match(/<?https?:\/\/twitter\.com\/(?:#!\/)?(\w+)\/status(?:es)?\/(\d+)>?/i);
-            console.log("twitter", twitterMatch, "twitter");
             if (twitterMatch)
               payload = payload.replace(twitterMatch[0], "");
             let retMsg = {
