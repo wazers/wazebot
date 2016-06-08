@@ -314,7 +314,12 @@ controller.on('hello', function (bot, data) {
       as_user: true
     });
   });
-  if (process.env.CI)
+  if (process.env.CI) {
+    deleteBot.api.chat.postMessage({
+      channel: privateGroup.id,
+      text: "Testing message, automated. https://www.waze.com/editor?env=row&lon=3.61973&lat=50.87647&zoom=3&segments=212456725%2C212456726%2C212457016%2C88111055%2C191987044%2C151451961%2C88141039&mapUpdateRequest=6241911 https://twitter.com/WazeBelgium/status/740174249604812804 an example message including both a tweet (with quote) and an editor url. L1",
+      as_user: true
+    });
     setTimeout(function () {
       bot.api.chat.postMessage({
         channel: privateGroup.id,
@@ -332,6 +337,7 @@ controller.on('hello', function (bot, data) {
         console.log('Stopped listening on ' + config.server_port);
       });
     }, 15000);
+  }
 })
 controller.on('rtm_open', function (bot, data) {
   console.log("rtm opened", data);
