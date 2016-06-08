@@ -54,10 +54,6 @@ var bot = controller.spawn({
   privateGroup = find(groups, {name: config.slack.privateGroup || 'private_test'});
   publicChannel = find(channels, {name: config.slack.publicChannel || 'general'});
   // console.log("payload", payload, "end payload");
-  //TODO embed in users[]
-  usersColl.find().forEach(function (u) {
-    uLang[u._id] = u.lang;
-  });
   // controller.storage.users.all(function (err, all_user_data) {
   //   all_user_data.forEach(function (el) {
   //     uLang[el.id] = el.lang;
@@ -73,6 +69,10 @@ MongoClient.connect(config.dburi, function (err, db) {
     return console.warn(err);
   console.log("Connected correctly to server");
   usersColl = db.collection('users');
+  //TODO embed in users[]
+  usersColl.find().forEach(function (u) {
+    uLang[u._id] = u.lang;
+  });
   // db.close();
 });
 // var uri = 'nedb://memory';
