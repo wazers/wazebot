@@ -25,7 +25,8 @@ let merge = require('merge'), env = process.env.NODE_ENV || 'development',
     },
     server_port: parseInt(process.env.OPENSHIFT_NODEJS_PORT) || 80,
     server_ip: process.env.OPENSHIFT_NODEJS_IP,
-    dburi: (process.env.OPENSHIFT_MONGODB_DB_URL || "mongodb://localhost/") + "wazebot"
+    dburi: (process.env.OPENSHIFT_MONGODB_DB_URL || "mongodb://localhost/") + "wazebot",
+    longPayloadMin: 60
   };
 
 module.exports = (env == "development") ? merge.recursive(true, production, development) : production;
