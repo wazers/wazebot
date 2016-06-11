@@ -582,7 +582,7 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
       cUR = cUrl.query.mapUpdateRequest,
       cMP = cUrl.query.mapProblem,
       cVen = cUrl.query.venues,
-      longPayload = payload.length > 50;
+      longPayload = payload.length > config.longPayloadMin;
     for (var key in cUrl.query) {
       // skip loop if the property is from prototype
       if (!cUrl.query.hasOwnProperty(key)) continue;
@@ -603,16 +603,17 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
 
         geocoder.geocode(res[0].city + ", " + res[0].country)
           .then(function (resCity) {
-            let whosFirst = res[0].administrativeLevels.level2short.length < res[0].administrativeLevels.level1short.length,
+            let whosFirst = (res[0].administrativeLevels.level2short && res[0].administrativeLevels.level2short)
+                ? res[0].administrativeLevels.level2short.length < res[0].administrativeLevels.level1short.length : false,
               twitterMatch = payload.match(/<?https?:\/\/twitter\.com\/(?:#!\/)?(\w+)\/status(?:es)?\/(\d+)>?/i);
             if (twitterMatch)
               payload = payload.replace(twitterMatch[0], "");
             let retMsg = {
-              text: lockDesc + ((whosFirst) ? res[0].administrativeLevels.level2short : res[0].administrativeLevels.level1short) +
+              text: lockDesc + ((whosFirst) ? res[0].administrativeLevels.level2short : res[0].administrativeLevels.level1short || res[0].countryCode) +
               " <@" + cUser.id + ">: " + ((longPayload) ? "_" : "") +
-              payload.substr(0, (payload.indexOf("\n") > 0) ? payload.indexOf("\n") : 50) + ((longPayload) ? "..._" : "") + "\n" +
+              payload.substr(0, (payload.indexOf("\n") > 0) ? payload.indexOf("\n") : config.longPayloadMin) + ((longPayload) ? "..._" : "") + "\n" +
               ((lockLevel) ? "" : lockFull + "Region: ") + lockDesc + res[0].city + " " + lockDesc +
-              ((whosFirst) ? res[0].administrativeLevels.level1short : res[0].administrativeLevels.level2short) + " " +
+              ((res[0].administrativeLevels.level2short) ? (whosFirst) ? res[0].administrativeLevels.level1short : res[0].administrativeLevels.level2short : "") + " " +
               lockDesc + res[0].countryCode,
               mrkdwn: true,
               unfurl_links: true,
@@ -635,7 +636,7 @@ function prettyEditorUrl(cUser, lockLevel, cUrl, payload, intent, quote) {
                       value: "*" + ((cUrl.query.nodes) ? cNodes + " node" + ((cNodes > 1) ? "s" : "") :
                         ((cSegments > 0) ? cSegments + " segment" + ((cSegments > 1) ? "s" : "") :
                           (cUrl.query.cameras) ? cCameras + " camera" + ((cCameras > 1) ? "s" : "") :
-                            ((cVen) ? "Place" : ""))) + ((cUR || cMP) ? "* with a" : "*") +
+                            ((cVen) ? "Place" : "No selection"))) + ((cUR || cMP) ? "* and a" : "*") +
                       ((cUR) ? "n *Update Request*" : "") + ((cMP) ? " *Map Problem*" : "")
                     }
                   ],
