@@ -391,8 +391,22 @@ controller.hears('^((?:.|\n)*?)(?:L([0-7])((?:.|\n)*?))?<?((?:(?:https?|ftp):\/)
     if (err)
       if (process.env.CI)
         throw new Error("error deleting message", err, res);
-      else
-        console.log("error during remove", err, message.channel, message.ts);
+      else {
+        deleteBot.api.reactions.add({
+          name: "down",
+          channel: message.channel,
+          ts: message.ts,
+          as_user: true
+        }, function (err) {
+          if (err)
+            if (process.env.CI)
+              throw new Error("error adding reaction to message", err);
+            else {
+              console.log("error during adding reaction, original message already removed?", err, message.channel, message.ts);
+            }
+        });
+        console.log("error during remove, adding reaction", err, message.channel, message.ts);
+      }
   });
   //2 of 6 locklevel, 4 url
   // console.log("triggered", message, "Triggered", decodeURI(message.match[2]), url.parse(decodeURI(message.match[2]).replace(/&amp;/g, '&'), true));
